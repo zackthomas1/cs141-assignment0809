@@ -1,0 +1,62 @@
+class UserThread extends Thread{
+    String fileName; 
+    String line; 
+
+    UserThread(String f){
+    this.fileName = f;
+    }
+    public void run(){
+        processUserCommands(this.fileName);
+    }
+}
+
+public class OS141 {
+    int NUM_USERS = 4, NUM_DISKS=2, NUM_PRINTERS=3;
+    String userFileName[]; 
+    UserThread users[]; 
+    Disk disks[]; 
+    Printer printers[]; 
+    DiskManager diskManager; 
+    PrinterManager printerManager; 
+    
+    OS141(String argv[]){
+        configure(argv);
+        users = new UserThread[NUM_USERS]; 
+        disks = new UserThread[NUM_DISKS]; 
+        printers = new UserThread[NUM_PRINTERS]; 
+        diskManager = new DiskManager(); 
+        printerManager = new PinterManager();
+        }
+    
+    void startUserThreads(){
+        for(int i = 0; i < NUM_USERS; i++){
+            users[i].start();
+        }
+    }
+
+    void joinUserThreads(){
+        for(int i = 0; i < NUM_USERS; i++){
+            users[i].join();
+        }
+    }
+
+    private static OS141 instance; 
+
+    public static void instance(){
+        if (this.instance == null){
+            this.instance = new OS141(argv); 
+        }
+        return this.instance;
+    }
+
+    void configure(String argb[]) {}
+}
+
+public class App {
+    public static int main(String[] args) throws Exception {
+        OS141 os = OS141.instance(args); 
+
+        os.startUserThreads(); 
+        os.joinUserThreads();
+    }
+}

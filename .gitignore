@@ -26,3 +26,6 @@ replay_pid*
 
 bin/
 lib/
+
+docs/example/
+docs/input/

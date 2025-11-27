@@ -1,11 +1,11 @@
-import java.util.Hashtable;
 import java.io.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 // WARNING: DO NOT MODIFY HARDWARE
 // --------------------
 class Disk {
     static final int NUM_SECTORS = 2048;
-    static final int DISK_DELAY = 800;  // 80 for Gradescope
+    static final int DISK_DELAY = 80;  // 80 for Gradescope
 
     StringBuffer sectors[] = new StringBuffer[NUM_SECTORS];
 
@@ -33,9 +33,9 @@ class Disk {
 }
 
 class Printer {
-    static final int PRINT_DELAY = 2750; // 275 for Gradescope
+    static final int PRINT_DELAY = 275; // 275 for Gradescope
     
-    Printer(int id) {}
+    Printer() {}
     
     void print(StringBuffer data){
         // call sleep
@@ -53,93 +53,125 @@ class FileInfo {
     int diskNumber; 
     int startingSector; 
     int fileLength;
+
+    public FileInfo(int disk, int sector, int length) {
+        diskNumber = disk; 
+        startingSector = sector; 
+        fileLength = length;
+    }
 }
 
 // Threads
 // --------------------
 class UserThread extends Thread{
-    String fileName;
-    String line; 
+    String commandsFile;
 
     UserThread(String f) {
         super();
-        fileName = f;
+        commandsFile = f;
     }
 
     @Override
     public void run() {
-        processUserCommands(fileName); 
+        processUserCommands(commandsFile); 
     }
+
     void processUserCommands(String f){
-        System.out.println(f);
-        OS os = OS.getInstance();
-
-        try {
-            // initialize reader
-            FileInputStream inputStream = new FileInputStream(f);
-            BufferedReader myReader = new BufferedReader(new InputStreamReader(inputStream));
-
+        try (FileInputStream inputStream = new FileInputStream(f);
+            BufferedReader myReader = new BufferedReader(new InputStreamReader(inputStream))) {
             // read file
-            for(String line; (line = myReader.readLine()) != null;){
-                String[] cmds = line.split("\\s+");
-                switch(cmds[0]){
+            for(String line ;(line = myReader.readLine()) != null;){
+                // check if thread was interrupted
+                if(Thread.currentThread().isInterrupted()){
+                    System.err.println("Process interrupted");
+                    return;
+                }
+
+                String[] cmdargs = line.split("\\s+");
+                switch(cmdargs[0]) {
                     case ".save":
-                        System.out.printf("command: Save argument: %s\n", cmds[1]);
-                        saveFile(cmds[1]);
-                        break;
-                    case ".end":
-                        System.out.printf("command: End\n");
+                        saveFile(cmdargs[1], myReader);
                         break;
                     case ".print":
-                        System.out.printf("command: Print argument: %s\n", cmds[1]);
-                        printFile(cmds[1]);
+                        printFile(cmdargs[1]);
                         break; 
                     default: 
-                        System.out.printf("command: Print argument: %s\n", cmds[1]);
+                        System.out.printf("Unknown Command: %s", cmdargs[0]);
                         break;
                 }
             }
-            // close reader
-            inputStream.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            System.err.println("File not found");
+        } catch (IOException e) {
+            System.err.println("IO error");
         }
     }
 
-    saveFile(String file){
-        System.out.println();
+    void saveFile(String file, BufferedReader reader){
+        DiskManager dm = OS.getInstance().diskManager;
+        
+        System.out.printf("SAVE file %s from %s\n", file, commandsFile);
+        int diskIndex = dm.request();
+        int diskFreeSector = dm.getNextFreeSector(diskIndex);
+        int offset = 0;
+        
+        try {
+            for(String line; (line = reader.readLine()) != null;){
+                if(".end".equals(line)){
+                    dm.directoryManager.enter(file, new FileInfo(diskIndex, diskFreeSector, offset));
+                    dm.setNextFreeSector(diskIndex, diskFreeSector + offset);
+                    break;
+                }else{
+                    dm.disks[diskIndex].write(diskFreeSector + offset, new StringBuffer(line));
+                    offset++;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("IO error");
+        }
+        dm.release(diskIndex);
     }
 
-    printFile(String file){
+    void printFile(String file){
+        PrinterJobThread printerThread = new PrinterJobThread(file); 
+        printerThread.start();
 
+        try {
+            printerThread.join();
+        } catch (InterruptedException e){
+            Thread.currentThread().interrupt();
+        }
     }
 }
 
 class PrinterJobThread extends Thread{
-    PrinterJobThread() {
+    String file;
+    PrinterJobThread(String f) {
         super();
+        file = f;
     }
 
     @Override
     public void run() {
+        System.out.printf("PRINT file %s\n", file);
+        DiskManager dm = OS.getInstance().diskManager;
+        PrinterManager pm = OS.getInstance().printerManager;
 
+        StringBuffer line = new StringBuffer();
+        FileInfo f = dm.directoryManager.lookup(file);
+        int start = f.startingSector;
+        int diskIndex = f.diskNumber; 
+        int printerIndex = pm.request();
+        for(int i = 0; i < f.fileLength; i++){
+            dm.disks[diskIndex].read(start + i, line);
+            pm.printers[printerIndex].print(line);
+        }
+        pm.release(printerIndex);
     }
 }
 
 // Managers
 // --------------------
-class DirectoryManager{
-    private Hashtable<String, FileInfo> T = new Hashtable<String, FileInfo>();
-    
-    void enter(StringBuffer fileName, FileInfo file){
-
-    }
-
-    FileInfo lookup(StringBuffer fileName){
-        return null;
-    }
-}
-
 class ResourceManager{
     boolean isFree[]; 
     
@@ -160,7 +192,9 @@ class ResourceManager{
                 try {
                     this.wait(); // block until someone releases resource
                 } catch (InterruptedException e) {
-
+                    Thread.currentThread().interrupt();
+                    System.err.println("Thread interrupted");
+                    return -1;
                 }
             }
         }
@@ -172,14 +206,39 @@ class ResourceManager{
     }
 }
 
+class DirectoryManager{
+    private final ConcurrentHashMap<String, FileInfo> T = new ConcurrentHashMap<>();
+    
+    void enter(String fileName, FileInfo fileinfo){
+        T.put(fileName, fileinfo);
+    }
+
+    FileInfo lookup(String fileName){
+        return T.get(fileName);
+    }
+}
+
 class DiskManager extends ResourceManager{
     Disk disks[]; 
+    int freeSectors[];
     DirectoryManager directoryManager;
     
     DiskManager(int numberOfDisk) {
         super(numberOfDisk);
         directoryManager = new DirectoryManager();
         disks = new Disk[numberOfDisk];
+        for(int i = 0; i < disks.length; i++){ 
+            disks[i] = new Disk(); 
+        }
+        freeSectors = new int[numberOfDisk];
+    }
+
+    void setNextFreeSector(int d, int offset){ 
+        freeSectors[d] = offset;
+    }
+
+    int getNextFreeSector(int d){
+        return freeSectors[d];
     }
 }
 
@@ -189,13 +248,16 @@ class PrinterManager extends ResourceManager{
     PrinterManager(int numberOfPrinters) {
         super(numberOfPrinters);
         printers = new Printer[numberOfPrinters];
+        for(int i = 0; i < numberOfPrinters; i++){
+            printers[i] = new Printer();
+        }
     }
 }
 
 // OS
 // --------------------
 class OS {
-    public static int NUM_USERS = 1, NUM_DISK = 1, NUM_PRINTERS = 1;
+    public static int NUM_USERS = 3, NUM_DISK = 1, NUM_PRINTERS = 1;
     public static String INPUT_DIR = "docs/input/";
     private static OS instance;
 

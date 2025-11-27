@@ -7,9 +7,9 @@
 
         {
             "type": "java",
-            "name": "Debug App",
+            "name": "Debug MainClass",
             "request": "launch",
-            "mainClass": "App",
+            "mainClass": "MainClass",
             "args": "23 2 4"
         }
     ]

@@ -7,9 +7,14 @@ class Disk {
     static final int NUM_SECTORS = 2048;
     static final int DISK_DELAY = 80;  // 80 for Gradescope
 
-    StringBuffer sectors[] = new StringBuffer[NUM_SECTORS];
+    StringBuffer sectors[];
 
-    Disk() {}
+    Disk() {
+        sectors = new StringBuffer[NUM_SECTORS];
+        for(int i = 0; i < NUM_SECTORS; i++){
+            sectors[i] = new StringBuffer();
+        }
+    }
 
     void write(int sector, StringBuffer data){
         // call sleep
@@ -18,7 +23,8 @@ class Disk {
         } catch (InterruptedException e){
             Thread.currentThread().interrupt();
         }
-        sectors[sector] = data;
+        sectors[sector].delete(0, sectors[sector].length());
+        sectors[sector].append(data);
     }
     void read(int sector, StringBuffer data){
         // call sleep
@@ -135,12 +141,6 @@ class UserThread extends Thread{
     void printFile(String file){
         PrinterJobThread printerThread = new PrinterJobThread(file); 
         printerThread.start();
-
-        try {
-            printerThread.join();
-        } catch (InterruptedException e){
-            Thread.currentThread().interrupt();
-        }
     }
 }
 
@@ -157,14 +157,14 @@ class PrinterJobThread extends Thread{
         DiskManager dm = OS.getInstance().diskManager;
         PrinterManager pm = OS.getInstance().printerManager;
 
-        StringBuffer line = new StringBuffer();
+        StringBuffer lineBuffer = new StringBuffer();
         FileInfo f = dm.directoryManager.lookup(file);
         int start = f.startingSector;
         int diskIndex = f.diskNumber; 
         int printerIndex = pm.request();
         for(int i = 0; i < f.fileLength; i++){
-            dm.disks[diskIndex].read(start + i, line);
-            pm.printers[printerIndex].print(line);
+            dm.disks[diskIndex].read(start + i, lineBuffer);
+            pm.printers[printerIndex].print(lineBuffer);
         }
         pm.release(printerIndex);
     }
@@ -189,13 +189,13 @@ class ResourceManager{
                     isFree[i] = false;
                     return i;
                 }
-                try {
-                    this.wait(); // block until someone releases resource
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    System.err.println("Thread interrupted");
-                    return -1;
-                }
+            }
+            try {
+                this.wait(); // block until someone releases resource
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.err.println("Thread interrupted");
+                return -1;
             }
         }
     }
@@ -257,7 +257,7 @@ class PrinterManager extends ResourceManager{
 // OS
 // --------------------
 class OS {
-    public static int NUM_USERS = 3, NUM_DISK = 1, NUM_PRINTERS = 1;
+    public static int NUM_USERS = 4, NUM_DISK = 2, NUM_PRINTERS = 2;
     public static String INPUT_DIR = "docs/input/";
     private static OS instance;
 

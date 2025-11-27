@@ -316,16 +316,18 @@ public class MainClass {
                 String arg0 = args[0].startsWith("-") ? args[0].substring(1) : args[0];
                 String arg1 = args[1].startsWith("-") ? args[1].substring(1) : args[1];
                 String arg2 = args[2].startsWith("-") ? args[2].substring(1) : args[2];
-                String arg3 = args[2].startsWith("-") ? args[2].substring(1) : args[3];
                 
                 numUsers = Integer.parseInt(arg0);
                 numDisks = Integer.parseInt(arg1);
                 numPrinters = Integer.parseInt(arg2);
-                inputDir = arg3;
-
             } catch (NumberFormatException e) {
                 System.err.println("Invalid number format: " + e.getMessage());
             }
+        }
+
+        if (args.length >= 4) {
+            String arg3 = args[3].startsWith("-") ? args[2].substring(1) : args[3];
+            inputDir = arg3;
         }
 
         os = new OS(numUsers, numDisks, numPrinters, inputDir);

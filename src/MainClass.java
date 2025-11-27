@@ -265,16 +265,14 @@ class PrinterManager extends ResourceManager{
 // OS
 // --------------------
 class OS {
-    public static final String INPUT_DIR = "";
-
     UserThread users[]; 
     DiskManager diskManager; 
     PrinterManager printerManager; 
 
-    OS(int numUsers, int numDisks, int numPrinters) {
+    OS(int numUsers, int numDisks, int numPrinters, String inputDir) {
         users = new UserThread[numUsers]; 
         for(int i = 0; i < users.length; i++){
-            String fname = OS.INPUT_DIR + "USER" + i;
+            String fname = inputDir + "USER" + i;
             users[i] = new UserThread(fname); 
         }
         diskManager = new DiskManager(numDisks);
@@ -310,23 +308,27 @@ public class MainClass {
         System.out.println("*** 141 OS Simulation ***");
 
         int numUsers = 1, numDisks = 1, numPrinters = 1;
-        
+        String inputDir = "";
+
         if (args.length >= 3) {
             try {
                 // Handle negative numbers by removing '-' prefix
                 String arg0 = args[0].startsWith("-") ? args[0].substring(1) : args[0];
                 String arg1 = args[1].startsWith("-") ? args[1].substring(1) : args[1];
                 String arg2 = args[2].startsWith("-") ? args[2].substring(1) : args[2];
+                String arg3 = args[2].startsWith("-") ? args[2].substring(1) : args[3];
                 
                 numUsers = Integer.parseInt(arg0);
                 numDisks = Integer.parseInt(arg1);
                 numPrinters = Integer.parseInt(arg2);
+                inputDir = arg3;
+
             } catch (NumberFormatException e) {
                 System.err.println("Invalid number format: " + e.getMessage());
             }
         }
 
-        os = new OS(numUsers, numDisks, numPrinters);
+        os = new OS(numUsers, numDisks, numPrinters, inputDir);
         os.startUserThreads();
         os.joinUserThreads();
     }

@@ -41,18 +41,27 @@ class Disk {
 class Printer {
     static final int PRINT_DELAY = 275; // 275 for Gradescope
     
-    Printer() {}
+    int printerId;
+
+    Printer(int id) {
+        printerId = id;
+    }
     
     void print(StringBuffer data){
         // call sleep
-        try{
+        try(FileWriter writer = new FileWriter("PRINTER"+printerId, true)){
             Thread.sleep(PRINT_DELAY);
+
+            System.out.println(data.toString());
+            writer.write(data.toString());
+            writer.write(System.lineSeparator());   // Add newline between
+            writer.flush(); // ensure data written immediately
         } catch (InterruptedException e){
             Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            System.err.println("IO error");
         }
-        System.out.println(data.toString());
     }
-
 }
 
 class FileInfo {
@@ -195,7 +204,6 @@ class ResourceManager{
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 System.err.println("Thread interrupted");
-                return -1;
             }
         }
     }
@@ -249,7 +257,7 @@ class PrinterManager extends ResourceManager{
         super(numberOfPrinters);
         printers = new Printer[numberOfPrinters];
         for(int i = 0; i < numberOfPrinters; i++){
-            printers[i] = new Printer();
+            printers[i] = new Printer(i);
         }
     }
 }
@@ -257,8 +265,7 @@ class PrinterManager extends ResourceManager{
 // OS
 // --------------------
 class OS {
-    public static int NUM_USERS = 4, NUM_DISK = 2, NUM_PRINTERS = 2;
-    public static String INPUT_DIR = "docs/input/";
+    public static final String INPUT_DIR = "docs/input/";
     private static OS instance;
 
     public static OS getInstance() {
@@ -273,13 +280,13 @@ class OS {
     PrinterManager printerManager; 
 
     private OS() {
-        users = new UserThread[OS.NUM_USERS]; 
+        users = new UserThread[App.NUM_USERS]; 
         for(int i = 0; i < users.length; i++){
             String fname = OS.INPUT_DIR + "User" + i;
             users[i] = new UserThread(fname); 
         }
-        diskManager = new DiskManager(OS.NUM_DISK);
-        printerManager = new PrinterManager(OS.NUM_PRINTERS);
+        diskManager = new DiskManager(App.NUM_DISK);
+        printerManager = new PrinterManager(App.NUM_PRINTERS);
     }
 
     void startUserThreads(){
@@ -301,14 +308,27 @@ class OS {
 
 
 public class App {
+    public static int NUM_USERS = 4, NUM_DISK = 1, NUM_PRINTERS = 2;
+
     public static void main(String[] args){
-        //
+
+        // parse command line args
         for (int i=0; i<args.length; ++i)
             System.out.println("Args[" + i + "] = " + args[i]);
 
-        System.out.println("*** 141 OS Simulation ***");
+        try {
+            NUM_USERS       = Integer.parseInt(args[0]);
+            NUM_DISK        = Integer.parseInt(args[1]);
+            NUM_PRINTERS    = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid number format: " + e.getMessage());
+        }
 
+        //
+        System.out.println("*** 141 OS Simulation ***");
         OS os = OS.getInstance(); 
+
+        //
         os.startUserThreads();
         os.joinUserThreads();
     }

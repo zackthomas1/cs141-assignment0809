@@ -123,7 +123,7 @@ class UserThread extends Thread{
     }
 
     void saveFile(String file, BufferedReader reader){
-        DiskManager dm = OS.getInstance().diskManager;
+        DiskManager dm = MainClass.os.diskManager;
         
         System.out.printf("SAVE file %s from %s\n", file, commandsFile);
         int diskIndex = dm.request();
@@ -163,8 +163,8 @@ class PrinterJobThread extends Thread{
     @Override
     public void run() {
         System.out.printf("PRINT file %s\n", file);
-        DiskManager dm = OS.getInstance().diskManager;
-        PrinterManager pm = OS.getInstance().printerManager;
+        DiskManager dm = MainClass.os.diskManager;
+        PrinterManager pm = MainClass.os.printerManager;
 
         StringBuffer lineBuffer = new StringBuffer();
         FileInfo f = dm.directoryManager.lookup(file);
@@ -266,27 +266,19 @@ class PrinterManager extends ResourceManager{
 // --------------------
 class OS {
     public static final String INPUT_DIR = "docs/input/";
-    private static OS instance;
-
-    public static OS getInstance() {
-        if(instance == null){
-            instance = new OS(); 
-        }    
-        return instance;
-    }
 
     UserThread users[]; 
     DiskManager diskManager; 
     PrinterManager printerManager; 
 
-    private OS() {
-        users = new UserThread[App.NUM_USERS]; 
+    OS(int numUsers, int numDisks, int numPrinters) {
+        users = new UserThread[numUsers]; 
         for(int i = 0; i < users.length; i++){
-            String fname = OS.INPUT_DIR + "User" + i;
+            String fname = OS.INPUT_DIR + "USER" + i;
             users[i] = new UserThread(fname); 
         }
-        diskManager = new DiskManager(App.NUM_DISK);
-        printerManager = new PrinterManager(App.NUM_PRINTERS);
+        diskManager = new DiskManager(numDisks);
+        printerManager = new PrinterManager(numPrinters);
     }
 
     void startUserThreads(){
@@ -307,28 +299,34 @@ class OS {
 }
 
 
-public class App {
-    public static int NUM_USERS = 4, NUM_DISK = 1, NUM_PRINTERS = 2;
+public class MainClass {
+    static OS os;
 
     public static void main(String[] args){
-
         // parse command line args
         for (int i=0; i<args.length; ++i)
             System.out.println("Args[" + i + "] = " + args[i]);
 
-        try {
-            NUM_USERS       = Integer.parseInt(args[0]);
-            NUM_DISK        = Integer.parseInt(args[1]);
-            NUM_PRINTERS    = Integer.parseInt(args[2]);
-        } catch (NumberFormatException e) {
-            System.err.println("Invalid number format: " + e.getMessage());
+        System.out.println("*** 141 OS Simulation ***");
+
+        int numUsers = 1, numDisks = 1, numPrinters = 1;
+        
+        if (args.length >= 3) {
+            try {
+                // Handle negative numbers by removing '-' prefix
+                String arg0 = args[0].startsWith("-") ? args[0].substring(1) : args[0];
+                String arg1 = args[1].startsWith("-") ? args[1].substring(1) : args[1];
+                String arg2 = args[2].startsWith("-") ? args[2].substring(1) : args[2];
+                
+                numUsers = Integer.parseInt(arg0);
+                numDisks = Integer.parseInt(arg1);
+                numPrinters = Integer.parseInt(arg2);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid number format: " + e.getMessage());
+            }
         }
 
-        //
-        System.out.println("*** 141 OS Simulation ***");
-        OS os = OS.getInstance(); 
-
-        //
+        os = new OS(numUsers, numDisks, numPrinters);
         os.startUserThreads();
         os.joinUserThreads();
     }

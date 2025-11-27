@@ -116,7 +116,7 @@ class UserThread extends Thread{
                 }
             }
         } catch (FileNotFoundException e) {
-            System.err.println("File not found");
+            System.err.printf("File not found: %s\n", f);
         } catch (IOException e) {
             System.err.println("IO error");
         }
@@ -265,7 +265,7 @@ class PrinterManager extends ResourceManager{
 // OS
 // --------------------
 class OS {
-    public static final String INPUT_DIR = "docs/input/";
+    public static final String INPUT_DIR = "";
 
     UserThread users[]; 
     DiskManager diskManager; 
@@ -282,13 +282,13 @@ class OS {
     }
 
     void startUserThreads(){
-        for(var user: users){
+        for(UserThread user: users){
             user.start(); 
         }
     }
 
     void joinUserThreads(){
-        for(var user: users){
+        for(UserThread user: users){
             try {
                 user.join();
             } catch (InterruptedException e){
